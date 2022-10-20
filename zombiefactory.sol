@@ -2,7 +2,6 @@ pragma solidity ^0.4.19;
 
 contract ZombieFactory {
 
-    // 여기에 이벤트 선언
     event NewZombie(uint zombieId, string name, uint dna);
 
     uint dnaDigits = 16;
@@ -15,10 +14,13 @@ contract ZombieFactory {
 
     Zombie[] public zombies;
 
+    mapping (uint => address) public zombieToOwner;
+    mapping (address => uint) ownerZombieCount;
+
     function _createZombie(string _name, uint _dna) private {
-        //zombies.push(Zombie(_name, _dna));
-        // 여기서 이벤트 실행
-        uint id = zombies.push(Zombie(_name, _dna)) -1;
+        uint id = zombies.push(Zombie(_name, _dna)) - 1;
+        zombieToOwner[id] = msg.sender;
+        ownerZombieCount[msg.sender]++;
         NewZombie(id, _name, _dna);
     }
 
@@ -28,6 +30,7 @@ contract ZombieFactory {
     }
 
     function createRandomZombie(string _name) public {
+        require(ownerZombieCount[msg.sender] == 0);
         uint randDna = _generateRandomDna(_name);
         _createZombie(_name, randDna);
     }
