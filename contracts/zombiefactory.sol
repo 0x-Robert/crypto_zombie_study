@@ -1,117 +1,49 @@
-<!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8">
-    <title>CryptoZombies front-end</title>
-    <script language="javascript" type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
-    <script language="javascript" type="text/javascript" src="web3.min.js"></script>
-    <script language="javascript" type="text/javascript" src="cryptozombies_abi.js"></script>
-  </head>
-  <body>
-    <div id="txStatus"></div>
-    <div id="zombies"></div>
+pragma solidity ^0.4.19;
 
-    <script>
-      var cryptoZombies;
-      var userAccount;
+import "./ownable.sol";
+import "./safemath.sol";
 
-      function startApp() {
-        var cryptoZombiesAddress = "YOUR_CONTRACT_ADDRESS";
-        cryptoZombies = new web3js.eth.Contract(cryptoZombiesABI, cryptoZombiesAddress);
+contract ZombieFactory is Ownable {
 
-        var accountInterval = setInterval(function() {
-          // 계정이 바뀌었는지 확인
-          if (web3.eth.accounts[0] !== userAccount) {
-            userAccount = web3.eth.accounts[0];
-            // 새 계정에 대한 UI로 업데이트하기 위한 함수 호출
-            getZombiesByOwner(userAccount)
-            .then(displayZombies);
-          }
-        }, 100);
-      }
+  using SafeMath for uint256;
 
-      function displayZombies(ids) {
-        $("#zombies").empty();
-        for (id of ids) {
-          // 우리 컨트랙트에서 좀비 상세 정보를 찾아, `zombie` 객체 반환
-          getZombieDetails(id)
-          .then(function(zombie) {
-            // HTML에 변수를 넣기 위해 ES6의 "template literal" 사용
-            // 각각을 #zombies div에 붙여넣기
-            $("#zombies").append(`<div class="zombie">
-              <ul>
-                <li>Name: ${zombie.name}</li>
-                <li>DNA: ${zombie.dna}</li>
-                <li>Level: ${zombie.level}</li>
-                <li>Wins: ${zombie.winCount}</li>
-                <li>Losses: ${zombie.lossCount}</li>
-                <li>Ready Time: ${zombie.readyTime}</li>
-              </ul>
-            </div>`);
-          });
-        }
-      }
+  event NewZombie(uint zombieId, string name, uint dna);
 
-      function createRandomZombie(name) {
-        // 시간이 꽤 걸릴 수 있으니, 트랜잭션이 보내졌다는 것을
-        // 유저가 알 수 있도록 UI를 업데이트해야 함
-        $("#txStatus").text("Creating new zombie on the blockchain. This may take a while...");
-        // 우리 컨트랙트에 전송하기:
-        return CryptoZombies.methods.createRandomZombie(name)
-        .send({ from: userAccount })
-        .on("receipt", function(receipt) {
-          $("#txStatus").text("Successfully created " + name + "!");
-          // 블록체인에 트랜잭션이 반영되었으며, UI를 다시 그려야 함
-          getZombiesByOwner(userAccount).then(displayZombies);
-        })
-        .on("error", function(error) {
-          // 사용자들에게 트랜잭션이 실패했음을 알려주기 위한 처리
-          $("#txStatus").text(error);
-        });
-      }
+  uint dnaDigits = 16;
+  uint dnaModulus = 10 ** dnaDigits;
+  uint cooldownTime = 1 days;
 
-      function feedOnKitty(zombieId, kittyId) {
-        $("#txStatus").text("Eating a kitty. This may take a while...");
-        return CryptoZombies.methods.feedOnKitty(zombieId, kittyId)
-        .send({ from: userAccount })
-        .on("receipt", function(receipt) {
-          $("#txStatus").text("Ate a kitty and spawned a new Zombie!");
-          getZombiesByOwner(userAccount).then(displayZombies);
-        })
-        .on("error", function(error) {
-          $("#txStatus").text(error);
-        });
-      }
+  struct Zombie {
+    string name;
+    uint dna;
+    uint32 level;
+    uint32 readyTime;
+    uint16 winCount;
+    uint16 lossCount;
+  }
 
-      // 여기서 시작하게.
+  Zombie[] public zombies;
 
-      function getZombieDetails(id) {
-        return cryptoZombies.methods.zombies(id).call()
-      }
+  mapping (uint => address) public zombieToOwner;
+  mapping (address => uint) ownerZombieCount;
 
-      function zombieToOwner(id) {
-        return cryptoZombies.methods.zombieToOwner(id).call()
-      }
+  function _createZombie(string _name, uint _dna) internal {
+    uint id = zombies.push(Zombie(_name, _dna, 1, uint32(now + cooldownTime), 0, 0)) - 1;
+    zombieToOwner[id] = msg.sender;
+    ownerZombieCount[msg.sender]++;
+    NewZombie(id, _name, _dna);
+  }
 
-      function getZombiesByOwner(owner) {
-        return cryptoZombies.methods.getZombiesByOwner(owner).call()
-      }
+  function _generateRandomDna(string _str) private view returns (uint) {
+    uint rand = uint(keccak256(_str));
+    return rand % dnaModulus;
+  }
 
-      window.addEventListener('load', function() {
+  function createRandomZombie(string _name) public {
+    require(ownerZombieCount[msg.sender] == 0);
+    uint randDna = _generateRandomDna(_name);
+    randDna = randDna - randDna % 100;
+    _createZombie(_name, randDna);
+  }
 
-        // Web3가 브라우저에 주입되었는지 확인(Mist/MetaMask)
-        if (typeof web3 !== 'undefined') {
-          // Mist/MetaMask의 프로바이더 사용
-          web3js = new Web3(web3.currentProvider);
-        } else {
-          // 사용자가 Metamask를 설치하지 않은 경우에 대해 처리
-          // 사용자들에게 Metamask를 설치하라는 등의 메세지를 보여줄 것
-        }
-
-        // 이제 자네 앱을 시작하고 web3에 자유롭게 접근할 수 있네:
-        startApp()
-
-      })
-    </script>
-  </body>
-</html>
+}

@@ -4,10 +4,6 @@ import "./zombieattack.sol";
 import "./erc721.sol";
 import "./safemath.sol";
 
-/// TODO: natspec에 맞도록 이 부분을 바꾸게.
-//@title 좀비 소유권을 관리하는 컨트랙트
-//@author robert.seo
-//@dev openzeppelin의 ERC721 표준을 따름
 contract ZombieOwnership is ZombieAttack, ERC721 {
 
   using SafeMath for uint256;
