@@ -1,18 +1,42 @@
-pragma solidity ^0.6.7;
+pragma solidity ^0.6.6;
+import "@chainlink/contracts/src/v0.6/VRFConsumerBase.sol";
 
-import "@chainlink/contracts/src/v0.6/interfaces/AggregatorV3Interface.sol";
+contract ZombieFactory is VRFConsumerbase {
 
-contract PriceConsumerV3 {
-  AggregatorV3Interface public priceFeed;
+    uint dnaDigits = 16;
+    uint dnaModulus = 10 ** dnaDigits;
 
-  constructor() public {
-    priceFeed = AggregatorV3Interface(0x8A753747A1Fa494EC906cE90E9f37563A8AF630e);
-  }
+    bytes32 public keyHash;
+    uint256 public fee;
+    uint256 public randomResult;
 
-  // Start here
-    function getLatestPrice() public view returns (int){
-        (,int price,,,) = priceFeed.latestRoundData();
-        return price;
-    } 
-    
+    struct Zombie {
+        string name;
+        uint dna;
+    }
+
+    Zombie[] public zombies;
+
+    constructor() VRFConsumerBase(
+        0xb3dCcb4Cf7a26f6cf6B120Cf5A73875B7BBc655B, // VRF Coordinator
+        0x01BE23585060835E02B77ef475b0Cc51aA1e0709  // LINK Token
+    ) public{
+        keyHash = 0x2ed0feb3e7fd2022120aa84fab1945545a9f2ffc9076fd6156fa96eaff4c1311;
+        fee = 100000000000000000;
+
+    }
+
+    function _createZombie(string memory _name, uint _dna) private {
+        zombies.push(Zombie(_name, _dna));
+    }
+
+    // 1. Create the `getRandomNumber` function
+
+    // 2. Create the `fulfillRandomness` function
+
+    function _generatePseudoRandomDna(string memory _str) private view returns (uint) {
+        uint rand = uint(keccak256(abi.encodePacked(_str)));
+        return rand % dnaModulus;
+    }
+
 }
